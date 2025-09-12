@@ -195,6 +195,97 @@ class PostgresConnector(SQLConnector):
             return self.config["filter_schemas"]
         return super().get_schema_names(engine, inspected)
 
+    def _get_selectable_column_names(
+        self,
+        conn: sa.engine.Connection,
+        schema_name: str,
+        table_name: str,
+    ) -> set[str]:
+        """
+        Return the set of column names the current user can SELECT for a given table.
+        """
+        sql = sa.text(
+            """
+            SELECT a.attname
+            FROM pg_attribute a
+            JOIN pg_class c ON c.oid = a.attrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE a.attnum > 0
+              AND NOT a.attisdropped
+              AND n.nspname = :schema
+              AND c.relname  = :table
+              AND has_column_privilege(c.oid, a.attname, 'SELECT') = true
+            """
+        )
+        rows = conn.execute(sql, {"schema": schema_name, "table": table_name})
+        return {r[0] for r in rows}
+
+    def discover_catalog_entries(self) -> list[dict]:
+        """
+        Override base discovery to drop columns the user cannot SELECT when the
+        `respect_column_privileges` flag is enabled.
+        """
+        entries = super().discover_catalog_entries()
+
+        if not self.config.get("respect_column_privileges", False):
+            return entries
+
+        # Filter properties (and related metadata) to only allowed columns.
+        with self.create_engine().connect() as conn:
+            for entry in entries:
+                # The SDK's discovery returns these fields on each entry:
+                #   - "schema_name", "table_name", "stream", "tap_stream_id",
+                #   - "schema" (JSON Schema dict), "metadata" (Singer metadata list),
+                #   - "replication_method", etc.
+                schema_name = entry.get("schema_name")
+                table_name = entry.get("table_name")
+                if not schema_name or not table_name:
+                    # Some dialects/objects may not have both; skip safely.
+                    continue
+
+                allowed = self._get_selectable_column_names(conn, schema_name, table_name)
+                if not allowed:
+                    # If nothing is allowed, keep the stream but with an empty schema.
+                    entry_schema = entry.get("schema", {})
+                    props = entry_schema.get("properties", {})
+                    for k in list(props.keys()):
+                        props.pop(k, None)
+                    # Also strip per-column metadata inclusions
+                    if "metadata" in entry and isinstance(entry["metadata"], list):
+                        filtered_meta = []
+                        for m in entry["metadata"]:
+                            # Keep only non-column level entries or entries for allowed columns
+                            breadcrumb = m.get("breadcrumb") or []
+                            if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
+                                if breadcrumb[1] in allowed:
+                                    filtered_meta.append(m)
+                            else:
+                                filtered_meta.append(m)
+                        entry["metadata"] = filtered_meta
+                    continue
+
+                # Prune JSON Schema properties
+                entry_schema = entry.get("schema", {})
+                props = entry_schema.get("properties", {})
+                for col in list(props.keys()):
+                    if col not in allowed:
+                        props.pop(col, None)
+
+                # Prune column-level metadata to match the remaining properties
+                if "metadata" in entry and isinstance(entry["metadata"], list):
+                    filtered_meta = []
+                    for m in entry["metadata"]:
+                        breadcrumb = m.get("breadcrumb") or []
+                        # Column-level metadata looks like ["properties", "<col_name>"]
+                        if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
+                            if breadcrumb[1] in allowed:
+                                filtered_meta.append(m)
+                        else:
+                            # Keep stream/table-level metadata entries
+                            filtered_meta.append(m)
+                    entry["metadata"] = filtered_meta
+
+        return entries
 
 class PostgresStream(SQLStream):
     """Stream class for Postgres streams."""

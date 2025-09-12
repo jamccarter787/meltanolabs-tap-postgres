@@ -345,6 +345,11 @@ class TapPostgres(SQLTap):
                 "this choice. One of `FULL_TABLE`, `INCREMENTAL`, or `LOG_BASED`."
             ),
         ),
+        th.Property(
+            "respect_column_privileges",
+            th.BooleanType,
+            description="Whether to respect column privileges.",
+        ),
     ).to_dict()
 
     def get_sqlalchemy_url(self, config: Mapping[str, Any]) -> str:
