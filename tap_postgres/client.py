@@ -225,7 +225,7 @@ class PostgresConnector(SQLConnector):
     def discover_catalog_entries(self) -> list[dict]:
         entries = super().discover_catalog_entries()
 
-        if not self.config.get("respect_column_privileges", False):
+        if self.config.get("respect_column_privileges", False):
             self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
             return entries
 
