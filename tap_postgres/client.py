@@ -274,7 +274,7 @@ class PostgresConnector(SQLConnector):
 
                 filtered_entries.append(entry)
 
-        logger.debug("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
+        self.logger.info("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
         return filtered_entries
 
 class PostgresStream(SQLStream):
