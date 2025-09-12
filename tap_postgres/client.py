@@ -223,71 +223,59 @@ class PostgresConnector(SQLConnector):
         return allowed
 
     def discover_catalog_entries(self) -> list[dict]:
-        """
-        Override base discovery to drop columns the user cannot SELECT when the
-        `respect_column_privileges` flag is enabled.
-        """
         entries = super().discover_catalog_entries()
 
         if not self.config.get("respect_column_privileges", False):
+            self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
             return entries
 
-        # Filter properties (and related metadata) to only allowed columns.
+        filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                # The SDK's discovery returns these fields on each entry:
-                #   - "schema_name", "table_name", "stream", "tap_stream_id",
-                #   - "schema" (JSON Schema dict), "metadata" (Singer metadata list),
-                #   - "replication_method", etc.
                 schema_name = entry.get("schema_name")
                 table_name = entry.get("table_name")
                 if not schema_name or not table_name:
-                    # Some dialects/objects may not have both; skip safely.
+                    filtered_entries.append(entry)
                     continue
+
+                orig_props = sorted((entry.get("schema", {}) or {}).get("properties", {}).keys())
+                self.logger.info("PRIVS original props for %s.%s → %s", schema_name, table_name, orig_props)
 
                 allowed = self._get_selectable_column_names(conn, schema_name, table_name)
+
                 if not allowed:
-                    # If nothing is allowed, keep the stream but with an empty schema.
-                    entry_schema = entry.get("schema", {})
-                    props = entry_schema.get("properties", {})
-                    for k in list(props.keys()):
-                        props.pop(k, None)
-                    # Also strip per-column metadata inclusions
-                    if "metadata" in entry and isinstance(entry["metadata"], list):
-                        filtered_meta = []
-                        for m in entry["metadata"]:
-                            # Keep only non-column level entries or entries for allowed columns
-                            breadcrumb = m.get("breadcrumb") or []
-                            if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
-                                if breadcrumb[1] in allowed:
-                                    filtered_meta.append(m)
-                            else:
-                                filtered_meta.append(m)
-                        entry["metadata"] = filtered_meta
+                    self.logger.info("PRIVS dropping stream with no readable columns: %s.%s", schema_name, table_name)
                     continue
 
-                # Prune JSON Schema properties
-                entry_schema = entry.get("schema", {})
-                props = entry_schema.get("properties", {})
+                # Prune schema props
+                entry_schema = entry.get("schema", {}) or {}
+                props = entry_schema.get("properties", {}) or {}
                 for col in list(props.keys()):
                     if col not in allowed:
                         props.pop(col, None)
 
-                # Prune column-level metadata to match the remaining properties
+                final_props = sorted(props.keys())
+                self.logger.info(
+                    "PRIVS final props for %s.%s (kept=%d / orig=%d): %s",
+                    schema_name, table_name, len(final_props), len(orig_props), final_props,
+                )
+
+                # Prune column-level metadata
                 if "metadata" in entry and isinstance(entry["metadata"], list):
                     filtered_meta = []
                     for m in entry["metadata"]:
                         breadcrumb = m.get("breadcrumb") or []
-                        # Column-level metadata looks like ["properties", "<col_name>"]
                         if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
                             if breadcrumb[1] in allowed:
                                 filtered_meta.append(m)
                         else:
-                            # Keep stream/table-level metadata entries
                             filtered_meta.append(m)
                     entry["metadata"] = filtered_meta
 
-        return entries
+                filtered_entries.append(entry)
+
+        logger.debug("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
+        return filtered_entries
 
 class PostgresStream(SQLStream):
     """Stream class for Postgres streams."""
