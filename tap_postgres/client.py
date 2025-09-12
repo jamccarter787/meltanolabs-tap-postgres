@@ -218,7 +218,9 @@ class PostgresConnector(SQLConnector):
             """
         )
         rows = conn.execute(sql, {"schema": schema_name, "table": table_name})
-        return {r[0] for r in rows}
+        allowed = {r[0] for r in rows}
+        self.logger.info(f"Allowed columns for {schema_name}.{table_name}: {allowed}")
+        return allowed
 
     def discover_catalog_entries(self) -> list[dict]:
         """
