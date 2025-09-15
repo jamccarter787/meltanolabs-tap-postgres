@@ -225,8 +225,7 @@ class PostgresConnector(SQLConnector):
         return allowed
 
     def discover_catalog_entries(self) -> list[dict]:
-        ic()
-        ic(entries = super().discover_catalog_entries())
+        entries = ic(super().discover_catalog_entries())
         self.logger.info("PRIVS discovery complete. Streams found: %d", len(entries))
         
         if not self.config.get("respect_column_privileges", False):
