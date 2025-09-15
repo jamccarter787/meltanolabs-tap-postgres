@@ -26,6 +26,8 @@ from tap_postgres.client import (
     PostgresStream,
 )
 
+import pdb
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
@@ -547,6 +549,7 @@ class TapPostgres(SQLTap):
             The tap's catalog as a dict
         """
         self.logger.info("DUMMY LOG INPUT")
+        pdb.set_trace()
         if self._catalog_dict:
             return self._catalog_dict
 
