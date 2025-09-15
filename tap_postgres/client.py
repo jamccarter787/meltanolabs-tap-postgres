@@ -238,10 +238,11 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                schema_name = entry.get("schema_name")
-                table_name = entry.get("table_name")
+                schema_name = ic(entry.get("schema_name"))
+                table_name = ic(entry.get("table_name"))
+                ic(json.dumps(entry))
                 if not schema_name or not table_name:
-                    filtered_entries.append(entry)
+                    ic(filtered_entries.append(entry))
                     continue
 
                 orig_props = sorted((entry.get("schema", {}) or {}).get("properties", {}).keys())
