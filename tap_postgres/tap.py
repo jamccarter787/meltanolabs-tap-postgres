@@ -557,7 +557,7 @@ class TapPostgres(SQLTap):
         #     return self.input_catalog.to_dict()
 
         result: dict[str, list[dict]] = {"streams": []}
-        ic(result["streams"].extend(self.connector.discover_catalog_entries()))
+        result["streams"].extend(self.connector.discover_catalog_entries())
 
         self._catalog_dict: dict = result
         self.logger.info("Returning discovered catalog dictionary")
