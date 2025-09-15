@@ -238,7 +238,7 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                schema_name = ic(entry.get("schema_name"))
+                schema_name = ic(entry.get("schema"))
                 table_name = ic(entry.get("table_name"))
                 ic(json.dumps(entry))
                 if not schema_name or not table_name:
