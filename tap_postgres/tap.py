@@ -547,7 +547,6 @@ class TapPostgres(SQLTap):
             The tap's catalog as a dict
         """
         self.logger.info("DUMMY LOG INPUT")
-        breakpoint()
         if self._catalog_dict:
             return self._catalog_dict
 
