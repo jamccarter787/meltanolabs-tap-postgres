@@ -10,7 +10,6 @@ import sys
 from functools import cached_property
 from os import chmod, path
 from typing import TYPE_CHECKING, Any, cast
-from icecream import ic
 
 import paramiko
 from singer_sdk import Stream
@@ -548,20 +547,17 @@ class TapPostgres(SQLTap):
             The tap's catalog as a dict
         """
         self.logger.info("DUMMY LOG INPUT")
-        if ic(self._catalog_dict):
-            self.logger.info("Returning cached catalog dictionary")
+        if self._catalog_dict:
             return self._catalog_dict
 
-        # if ic(self.input_catalog):
-        #     self.logger.info("Returning input catalog dictionary")
-        #     return self.input_catalog.to_dict()
+        if self.input_catalog:
+            return self.input_catalog.to_dict()
 
         result: dict[str, list[dict]] = {"streams": []}
         result["streams"].extend(self.connector.discover_catalog_entries())
 
         self._catalog_dict: dict = result
-        self.logger.info("Returning discovered catalog dictionary")
-        return ic(self._catalog_dict)
+        return self._catalog_dict
 
     @property
     def catalog(self) -> Catalog:

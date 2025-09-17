@@ -11,8 +11,6 @@ import json
 import select
 import typing as t
 from types import MappingProxyType
-from icecream import ic
-
 
 import psycopg2
 import singer_sdk.helpers._typing
@@ -225,9 +223,9 @@ class PostgresConnector(SQLConnector):
         return allowed
 
     def discover_catalog_entries(self) -> list[dict]:
-        entries = ic(super().discover_catalog_entries())
+        entries = super().discover_catalog_entries()
         self.logger.info("PRIVS discovery complete. Streams found: %d", len(entries))
-
+        
         if not self.config.get("respect_column_privileges", False):
             self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
             return entries
@@ -235,11 +233,10 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                schema_name = ic(entry.get("schema_name"))
-                table_name = ic(entry.get("table_name"))
-                ic(json.dumps(entry))
+                schema_name = entry.get("schema_name")
+                table_name = entry.get("table_name")
                 if not schema_name or not table_name:
-                    ic(filtered_entries.append(entry))
+                    filtered_entries.append(entry)
                     continue
 
                 orig_props = sorted((entry.get("schema", {}) or {}).get("properties", {}).keys())
