@@ -548,6 +548,12 @@ class TapPostgres(SQLTap):
             The tap's catalog as a dict
         """
         self.logger.info("DUMMY LOG INPUT")
+        result: dict[str, list[dict]] = {"streams": []}
+        result["streams"].extend(self.connector.discover_catalog_entries())
+
+        self._catalog_dict: dict = result
+        self.logger.info("Returning discovered catalog dictionary")
+        
         if self._catalog_dict:
             self.logger.info("Returning cached catalog dictionary")
             return self._catalog_dict
@@ -556,11 +562,6 @@ class TapPostgres(SQLTap):
             self.logger.info("Returning input catalog dictionary")
             return self.input_catalog.to_dict()
 
-        result: dict[str, list[dict]] = {"streams": []}
-        result["streams"].extend(self.connector.discover_catalog_entries())
-
-        self._catalog_dict: dict = result
-        self.logger.info("Returning discovered catalog dictionary")
         return self._catalog_dict
 
     @property
