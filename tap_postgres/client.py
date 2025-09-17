@@ -234,10 +234,10 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                schema_name = entry.get("schema_name")
-                table_name = entry.get("table_name")
-                ic(entry)
+                schema_name = ic(entry.get("schema_name"))
+                table_name = ic(entry.get("table_name"))
                 if not schema_name or not table_name:
+                    ic()
                     filtered_entries.append(entry)
                     continue
 
@@ -247,6 +247,7 @@ class PostgresConnector(SQLConnector):
                 allowed = self._get_selectable_column_names(conn, schema_name, table_name)
 
                 if not allowed:
+                    ic()
                     self.logger.info("PRIVS dropping stream with no readable columns: %s.%s", schema_name, table_name)
                     continue
 
