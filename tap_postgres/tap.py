@@ -561,7 +561,7 @@ class TapPostgres(SQLTap):
 
         self._catalog_dict: dict = result
         self.logger.info("Returning discovered catalog dictionary")
-        return ic(self._catalog_dict)
+        return self._catalog_dict
 
     @property
     def catalog(self) -> Catalog:
