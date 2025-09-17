@@ -540,29 +540,48 @@ class TapPostgres(SQLTap):
 
     @property
     def catalog_dict(self) -> dict:
-        """Get catalog dictionary.
+        """Get the tap's working catalog as a dict.
 
-        Override to prevent premature instantiation of the connector.
-
-        Returns:
-            The tap's catalog as a dict
+        If an input catalog (from Meltano selection) is present and
+        `respect_column_privileges` is true, we merge that *selection*
+        with schemas from *privilege-pruned* discovery. Otherwise we
+        return the input catalog as-is, or fall back to discovery.
         """
         self.logger.info("DUMMY LOG INPUT")
-        result: dict[str, list[dict]] = {"streams": []}
-        result["streams"].extend(self.connector.discover_catalog_entries())
 
-        self._catalog_dict: dict = result
-        self.logger.info("Returning discovered catalog dictionary")
-        
-        if self._catalog_dict:
+        # Return cached version if present
+        if getattr(self, "_catalog_dict", None):
             self.logger.info("Returning cached catalog dictionary")
             return self._catalog_dict
 
-        if self.input_catalog:
-            self.logger.info("Returning input catalog dictionary")
-            return self.input_catalog.to_dict()
+        privs_on = bool(self.config.get("respect_column_privileges", False))
+        has_input = bool(self.input_catalog)
 
+        if has_input and privs_on:
+            # 1) Run discovery (connector will prune by privileges when enabled)
+            discovered = self.connector.discover_catalog_entries()
+            # 2) Merge input selection onto pruned discovery schemas/metadata
+            merged = self._merge_selected_input_with_pruned_discovery(
+                self.input_catalog.to_dict(),
+                discovered,
+            )
+            self._catalog_dict = merged
+            self.logger.info("Returning merged (selected + pruned) catalog dictionary")
+            return self._catalog_dict
+
+        if has_input:
+            # Privilege pruning off → trust the input catalog as-is
+            self._catalog_dict = self.input_catalog.to_dict()
+            self.logger.info("Returning input catalog dictionary (privs off)")
+            return self._catalog_dict
+
+        # No input catalog → discovery only (connector may prune by privileges)
+        result: dict[str, list[dict]] = {"streams": []}
+        result["streams"].extend(self.connector.discover_catalog_entries())
+        self._catalog_dict = result
+        self.logger.info("Returning discovered catalog dictionary")
         return self._catalog_dict
+
 
     @property
     def catalog(self) -> Catalog:
@@ -638,3 +657,77 @@ class TapPostgres(SQLTap):
             else:
                 streams.append(PostgresStream(self, catalog_entry, connector=self.connector))
         return streams
+
+    def _merge_selected_input_with_pruned_discovery(
+        self,
+        input_catalog: dict,
+        pruned_entries: list[dict],
+    ) -> dict:
+        """Merge Meltano-selected input catalog with privilege-pruned discovery.
+
+        Keeps *selection* and replication settings from the input catalog,
+        but replaces schemas (and column-level metadata) with pruned versions
+        so sensitive columns are never present in the working catalog.
+        """
+        # Index pruned discovery by tap_stream_id (fallback to schema-table)
+        def _sid(entry: dict) -> str | None:
+            if entry.get("tap_stream_id"):
+                return entry["tap_stream_id"]
+            if entry.get("schema_name") and entry.get("table_name"):
+                return f"{entry['schema_name']}-{entry['table_name']}"
+            return None
+
+        pruned_by_id: dict[str, dict] = {}
+        for e in pruned_entries:
+            sid = _sid(e)
+            if sid:
+                pruned_by_id[sid] = e
+
+        merged_streams: list[dict] = []
+
+        for s in input_catalog.get("streams", []):
+            sid = s.get("tap_stream_id") or _sid(s)
+            if not sid:
+                # If we can't identify it, keep as-is (very rare)
+                merged_streams.append(s)
+                continue
+
+            d = pruned_by_id.get(sid)
+            if not d:
+                # Selected stream wasn’t in discovery (renamed/dropped?). Skip quietly.
+                self.logger.info("PRIVS merge: selected stream not found in discovery: %s", sid)
+                continue
+
+            # Replace schema with pruned schema (properties only; keep other attrs)
+            s_schema = (s.get("schema") or {}).copy()
+            d_schema = d.get("schema") or {}
+            s_schema["properties"] = (d_schema.get("properties") or {})
+            s["schema"] = s_schema
+
+            # Prune column-level metadata to columns we kept
+            keep_cols = set(s_schema.get("properties", {}).keys())
+            new_meta = []
+            for md in (s.get("metadata") or []):
+                breadcrumb = md.get("breadcrumb") or []
+                # Column-level entries look like ["properties", "<col>"]
+                if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
+                    if breadcrumb[1] in keep_cols:
+                        new_meta.append(md)
+                else:
+                    # keep stream-level and other non-column entries
+                    new_meta.append(md)
+            s["metadata"] = new_meta
+
+            # If replication_key is no longer selectable, downgrade for safety
+            rk = s.get("replication_key")
+            if rk and rk not in keep_cols:
+                self.logger.warning(
+                    "PRIVS merge: replication key '%s' not selectable for %s; downgrading to FULL_TABLE",
+                    rk, sid,
+                )
+                s["replication_key"] = None
+                s["replication_method"] = "FULL_TABLE"
+
+            merged_streams.append(s)
+
+        return {"streams": merged_streams}
