@@ -11,6 +11,7 @@ import json
 import select
 import typing as t
 from types import MappingProxyType
+from icecream import ic
 
 import psycopg2
 import singer_sdk.helpers._typing
@@ -233,6 +234,7 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
+                ic()
                 schema_name = entry.get("schema_name")
                 table_name = entry.get("table_name")
                 if not schema_name or not table_name:
