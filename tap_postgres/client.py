@@ -235,10 +235,9 @@ class PostgresConnector(SQLConnector):
         with self.create_engine().connect() as conn:
             for entry in entries:
                 root_meta = next((m.get("metadata", {}) for m in entry.get("metadata", []) if m.get("breadcrumb") == []),{},)
-                schema_name = ic(root_meta.get("schema-name"))
-                table_name = ic(entry.get("table_name"))
+                schema_name = root_meta.get("schema-name")
+                table_name = entry.get("table_name")
                 if not schema_name or not table_name:
-                    ic()
                     filtered_entries.append(entry)
                     continue
 
@@ -248,7 +247,6 @@ class PostgresConnector(SQLConnector):
                 allowed = self._get_selectable_column_names(conn, schema_name, table_name)
 
                 if not allowed:
-                    ic()
                     self.logger.info("PRIVS dropping stream with no readable columns: %s.%s", schema_name, table_name)
                     continue
 
@@ -268,7 +266,6 @@ class PostgresConnector(SQLConnector):
                 # Prune column-level metadata
                 if "metadata" in entry and isinstance(entry["metadata"], list):
                     filtered_meta = []
-                    ic()
                     for m in entry["metadata"]:
                         breadcrumb = m.get("breadcrumb") or []
                         if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
