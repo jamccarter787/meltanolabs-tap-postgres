@@ -10,7 +10,6 @@ import sys
 from functools import cached_property
 from os import chmod, path
 from typing import TYPE_CHECKING, Any, cast
-from icecream import ic
 
 import paramiko
 from singer_sdk import Stream

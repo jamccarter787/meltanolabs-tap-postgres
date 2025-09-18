@@ -11,7 +11,6 @@ import json
 import select
 import typing as t
 from types import MappingProxyType
-from icecream import ic
 
 import psycopg2
 import singer_sdk.helpers._typing
