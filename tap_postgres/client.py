@@ -225,7 +225,7 @@ class PostgresConnector(SQLConnector):
 
     def discover_catalog_entries(self) -> list[dict]:
         entries = super().discover_catalog_entries()
-        self.logger.debug("PRIVS discovery complete. Streams found: %d", len(entries))
+        self.logger.info("PRIVS discovery complete. Streams found: %d", len(entries))
         
         if not self.config.get("respect_column_privileges", False):
             self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
@@ -242,7 +242,7 @@ class PostgresConnector(SQLConnector):
                     continue
 
                 orig_props = sorted((entry.get("schema", {}) or {}).get("properties", {}).keys())
-                self.logger.info("PRIVS original props for %s.%s → %s", schema_name, table_name, orig_props)
+                self.logger.debug("PRIVS original props for %s.%s → %s", schema_name, table_name, orig_props)
 
                 allowed = self._get_selectable_column_names(conn, schema_name, table_name)
 
@@ -258,7 +258,7 @@ class PostgresConnector(SQLConnector):
                         props.pop(col, None)
 
                 final_props = sorted(props.keys())
-                self.logger.info(
+                self.logger.debug(
                     "PRIVS final props for %s.%s (kept=%d / orig=%d): %s",
                     schema_name, table_name, len(final_props), len(orig_props), final_props,
                 )
@@ -277,7 +277,7 @@ class PostgresConnector(SQLConnector):
 
                 filtered_entries.append(entry)
 
-        self.logger.debug("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
+        self.logger.info("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
         return filtered_entries
 
 class PostgresStream(SQLStream):
