@@ -220,12 +220,12 @@ class PostgresConnector(SQLConnector):
         )
         rows = conn.execute(sql, {"schema": schema_name, "table": table_name})
         allowed = {r[0] for r in rows}
-        self.logger.info(f"Allowed columns for {schema_name}.{table_name}: {allowed}")
+        self.logger.debug(f"Allowed columns for {schema_name}.{table_name}: {allowed}")
         return allowed
 
     def discover_catalog_entries(self) -> list[dict]:
         entries = super().discover_catalog_entries()
-        self.logger.info("PRIVS discovery complete. Streams found: %d", len(entries))
+        self.logger.debug("PRIVS discovery complete. Streams found: %d", len(entries))
         
         if not self.config.get("respect_column_privileges", False):
             self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
@@ -247,7 +247,7 @@ class PostgresConnector(SQLConnector):
                 allowed = self._get_selectable_column_names(conn, schema_name, table_name)
 
                 if not allowed:
-                    self.logger.info("PRIVS dropping stream with no readable columns: %s.%s", schema_name, table_name)
+                    self.logger.debug("PRIVS dropping stream with no readable columns: %s.%s", schema_name, table_name)
                     continue
 
                 # Prune schema props
@@ -277,7 +277,7 @@ class PostgresConnector(SQLConnector):
 
                 filtered_entries.append(entry)
 
-        self.logger.info("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
+        self.logger.debug("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
         return filtered_entries
 
 class PostgresStream(SQLStream):
