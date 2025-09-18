@@ -234,12 +234,9 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                schema_name = ic(entry.get("schema_name"))
-                root_meta = ic(next((m.get("metadata", {}) for m in entry.get("metadata", []) if m.get("breadcrumb") == []),{},))
-                schema = ic(root_meta.get("schema-name"))
+                root_meta = next((m.get("metadata", {}) for m in entry.get("metadata", []) if m.get("breadcrumb") == []),{},)
+                schema_name = ic(root_meta.get("schema-name"))
                 table_name = ic(entry.get("table_name"))
-                meta = ic(entry.get("metadata"))
-                ic(entry)
                 if not schema_name or not table_name:
                     ic()
                     filtered_entries.append(entry)
