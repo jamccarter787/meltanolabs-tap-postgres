@@ -236,6 +236,8 @@ class PostgresConnector(SQLConnector):
             for entry in entries:
                 schema_name = ic(entry.get("schema_name"))
                 table_name = ic(entry.get("table_name"))
+                ic(entry)
+                breakpoint()
                 if not schema_name or not table_name:
                     ic()
                     filtered_entries.append(entry)
