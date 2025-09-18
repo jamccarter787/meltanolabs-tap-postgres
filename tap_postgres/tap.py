@@ -547,8 +547,6 @@ class TapPostgres(SQLTap):
         with schemas from *privilege-pruned* discovery. Otherwise we
         return the input catalog as-is, or fall back to discovery.
         """
-        self.logger.info("DUMMY LOG INPUT")
-
         # Return cached version if present
         if getattr(self, "_catalog_dict", None):
             self.logger.info("Returning cached catalog dictionary")
