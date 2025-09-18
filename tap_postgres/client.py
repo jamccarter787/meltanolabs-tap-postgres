@@ -236,6 +236,8 @@ class PostgresConnector(SQLConnector):
             for entry in entries:
                 schema_name = ic(entry.get("schema_name"))
                 table_name = ic(entry.get("table_name"))
+                meta = ic(entry.get("metadata"))
+                schema = ic(meta.get("schema_name"))
                 ic(entry)
                 if not schema_name or not table_name:
                     ic()
