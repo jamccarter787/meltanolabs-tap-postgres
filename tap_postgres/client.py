@@ -201,9 +201,7 @@ class PostgresConnector(SQLConnector):
         schema_name: str,
         table_name: str,
     ) -> set[str]:
-        """
-        Return the set of column names the current user can SELECT for a given table.
-        """
+        """Return the set of column names the current user can SELECT for a given table."""
         sql = sa.text(
             """
             SELECT a.attname
@@ -225,7 +223,6 @@ class PostgresConnector(SQLConnector):
     def discover_catalog_entries(self) -> list[dict]:
         entries = super().discover_catalog_entries()
         self.logger.info("PRIVS discovery beginning. Streams found: %d", len(entries))
-        
         if not self.config.get("respect_column_privileges", False):
             self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
             return entries
