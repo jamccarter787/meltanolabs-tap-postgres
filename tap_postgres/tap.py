@@ -579,7 +579,6 @@ class TapPostgres(SQLTap):
         self.logger.info("Returning discovered catalog dictionary")
         return self._catalog_dict
 
-
     @property
     def catalog(self) -> Catalog:
         """Get the tap's working catalog.
@@ -666,6 +665,7 @@ class TapPostgres(SQLTap):
         but replaces schemas (and column-level metadata) with pruned versions
         so sensitive columns are never present in the working catalog.
         """
+
         # Index pruned discovery by tap_stream_id (fallback to schema-table)
         def _sid(entry: dict) -> str | None:
             if entry.get("tap_stream_id"):
@@ -698,16 +698,16 @@ class TapPostgres(SQLTap):
             # Replace schema with pruned schema (properties only; keep other attrs)
             s_schema = (s.get("schema") or {}).copy()
             d_schema = d.get("schema") or {}
-            s_schema["properties"] = (d_schema.get("properties") or {})
+            s_schema["properties"] = d_schema.get("properties") or {}
             s["schema"] = s_schema
 
             # Prune column-level metadata to columns we kept
             keep_cols = set(s_schema.get("properties", {}).keys())
             new_meta = []
-            for md in (s.get("metadata") or []):
+            for md in s.get("metadata") or []:
                 breadcrumb = md.get("breadcrumb") or []
                 # Column-level entries look like ["properties", "<col>"]
-                if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
+                if len(breadcrumb) == 2 and breadcrumb[0] == "properties":  # noqa: PLR2004
                     if breadcrumb[1] in keep_cols:
                         new_meta.append(md)
                 else:
@@ -719,8 +719,10 @@ class TapPostgres(SQLTap):
             rk = s.get("replication_key")
             if rk and rk not in keep_cols:
                 self.logger.warning(
-                    "PRIVS merge: replication key '%s' not selectable for %s; downgrading to FULL_TABLE",
-                    rk, sid,
+                    "PRIVS merge: replication key '%s' not selectable for %s; "
+                    "downgrading to FULL_TABLE",
+                    rk,
+                    sid,
                 )
                 s["replication_key"] = None
                 s["replication_method"] = "FULL_TABLE"

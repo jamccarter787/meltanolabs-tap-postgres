@@ -221,16 +221,27 @@ class PostgresConnector(SQLConnector):
         return allowed
 
     def discover_catalog_entries(self) -> list[dict]:
+        """Discover catalog entries with optional column privilege filtering."""
         entries = super().discover_catalog_entries()
         self.logger.info("PRIVS discovery beginning. Streams found: %d", len(entries))
         if not self.config.get("respect_column_privileges", False):
-            self.logger.info("PRIVS disabled; returning unmodified discovery (%d entries).", len(entries))
+            self.logger.info(
+                "PRIVS disabled; returning unmodified discovery (%d entries).",
+                len(entries),
+            )
             return entries
 
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                root_meta = next((m.get("metadata", {}) for m in entry.get("metadata", []) if m.get("breadcrumb") == []),{},)
+                root_meta = next(
+                    (
+                        m.get("metadata", {})
+                        for m in entry.get("metadata", [])
+                        if m.get("breadcrumb") == []
+                    ),
+                    {},
+                )
                 schema_name = root_meta.get("schema-name")
                 table_name = entry.get("table_name")
                 if not schema_name or not table_name:
@@ -238,12 +249,21 @@ class PostgresConnector(SQLConnector):
                     continue
 
                 orig_props = sorted((entry.get("schema", {}) or {}).get("properties", {}).keys())
-                self.logger.debug("PRIVS original props for %s.%s → %s", schema_name, table_name, orig_props)
+                self.logger.debug(
+                    "PRIVS original props for %s.%s → %s",
+                    schema_name,
+                    table_name,
+                    orig_props,
+                )
 
                 allowed = self._get_selectable_column_names(conn, schema_name, table_name)
 
                 if not allowed:
-                    self.logger.debug("PRIVS dropping stream with no readable columns: %s.%s", schema_name, table_name)
+                    self.logger.debug(
+                        "PRIVS dropping stream with no readable columns: %s.%s",
+                        schema_name,
+                        table_name,
+                    )
                     continue
 
                 # Prune schema props
@@ -256,7 +276,11 @@ class PostgresConnector(SQLConnector):
                 final_props = sorted(props.keys())
                 self.logger.debug(
                     "PRIVS final props for %s.%s (kept=%d / orig=%d): %s",
-                    schema_name, table_name, len(final_props), len(orig_props), final_props,
+                    schema_name,
+                    table_name,
+                    len(final_props),
+                    len(orig_props),
+                    final_props,
                 )
 
                 # Prune column-level metadata
@@ -264,7 +288,7 @@ class PostgresConnector(SQLConnector):
                     filtered_meta = []
                     for m in entry["metadata"]:
                         breadcrumb = m.get("breadcrumb") or []
-                        if len(breadcrumb) == 2 and breadcrumb[0] == "properties":
+                        if len(breadcrumb) == 2 and breadcrumb[0] == "properties":  # noqa: PLR2004
                             if breadcrumb[1] in allowed:
                                 filtered_meta.append(m)
                         else:
@@ -275,6 +299,7 @@ class PostgresConnector(SQLConnector):
 
         self.logger.info("PRIVS discovery complete. Streams kept: %d", len(filtered_entries))
         return filtered_entries
+
 
 class PostgresStream(SQLStream):
     """Stream class for Postgres streams."""
