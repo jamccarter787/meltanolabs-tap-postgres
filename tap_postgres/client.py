@@ -11,6 +11,10 @@ import json
 import select
 import typing as t
 from types import MappingProxyType
+from typing import Any
+
+if t.TYPE_CHECKING:
+    from collections.abc import Sequence
 
 import psycopg2
 import singer_sdk.helpers._typing
@@ -220,9 +224,17 @@ class PostgresConnector(SQLConnector):
         self.logger.debug(f"Allowed columns for {schema_name}.{table_name}: {allowed}")
         return allowed
 
-    def discover_catalog_entries(self) -> list[dict]:
+    def discover_catalog_entries(
+        self,
+        *,
+        exclude_schemas: Sequence[str] = (),
+        reflect_indices: bool = True,
+    ) -> list[dict[Any, Any]]:
         """Discover catalog entries with optional column privilege filtering."""
-        entries = super().discover_catalog_entries()
+        entries = super().discover_catalog_entries(
+            exclude_schemas=exclude_schemas,
+            reflect_indices=reflect_indices,
+        )
         self.logger.info("PRIVS discovery beginning. Streams found: %d", len(entries))
         if not self.config.get("respect_column_privileges", False):
             self.logger.info(
@@ -234,7 +246,7 @@ class PostgresConnector(SQLConnector):
         filtered_entries: list[dict] = []
         with self.create_engine().connect() as conn:
             for entry in entries:
-                root_meta = next(
+                root_meta: dict[str, Any] = next(
                     (
                         m.get("metadata", {})
                         for m in entry.get("metadata", [])

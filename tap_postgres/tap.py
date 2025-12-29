@@ -538,7 +538,7 @@ class TapPostgres(SQLTap):
         sys.exit(1)  # Calling this to be sure atexit is called, so clean_up gets called
 
     @property
-    def catalog_dict(self) -> dict:
+    def catalog_dict(self) -> dict[Any, Any]:
         """Get the tap's working catalog as a dict.
 
         If an input catalog (from Meltano selection) is present and
@@ -547,9 +547,10 @@ class TapPostgres(SQLTap):
         return the input catalog as-is, or fall back to discovery.
         """
         # Return cached version if present
-        if getattr(self, "_catalog_dict", None):
+        cached_dict = getattr(self, "_catalog_dict", None)
+        if cached_dict is not None:
             self.logger.info("Returning cached catalog dictionary")
-            return self._catalog_dict
+            return cached_dict
 
         privs_on = bool(self.config.get("respect_column_privileges", False))
         has_input = bool(self.input_catalog)
@@ -558,15 +559,16 @@ class TapPostgres(SQLTap):
             # 1) Run discovery (connector will prune by privileges when enabled)
             discovered = self.connector.discover_catalog_entries()
             # 2) Merge input selection onto pruned discovery schemas/metadata
-            merged = self._merge_selected_input_with_pruned_discovery(
-                self.input_catalog.to_dict(),
-                discovered,
-            )
-            self._catalog_dict = merged
-            self.logger.info("Returning merged (selected + pruned) catalog dictionary")
-            return self._catalog_dict
+            if self.input_catalog is not None:
+                merged = self._merge_selected_input_with_pruned_discovery(
+                    self.input_catalog.to_dict(),
+                    discovered,
+                )
+                self._catalog_dict = merged
+                self.logger.info("Returning merged (selected + pruned) catalog dictionary")
+                return merged
 
-        if has_input:
+        if has_input and self.input_catalog is not None:
             # Privilege pruning off → trust the input catalog as-is
             self._catalog_dict = self.input_catalog.to_dict()
             self.logger.info("Returning input catalog dictionary (privs off)")
@@ -658,7 +660,7 @@ class TapPostgres(SQLTap):
         self,
         input_catalog: dict,
         pruned_entries: list[dict],
-    ) -> dict:
+    ) -> dict[Any, Any]:
         """Merge Meltano-selected input catalog with privilege-pruned discovery.
 
         Keeps *selection* and replication settings from the input catalog,
