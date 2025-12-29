@@ -691,7 +691,7 @@ class TapPostgres(SQLTap):
 
             d = pruned_by_id.get(sid)
             if not d:
-                # Selected stream wasn’t in discovery (renamed/dropped?). Skip quietly.
+                # Selected stream wasn't in discovery (renamed/dropped?). Skip quietly.
                 self.logger.info("PRIVS merge: selected stream not found in discovery: %s", sid)
                 continue
 
